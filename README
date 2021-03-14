@@ -1,0 +1,68 @@
+PENTRU COMPILARE
+SERVER make run_server
+SUBSCRIBER make run_subscriber ARGS=<ID-ul dorit>
+
+In fisierul helpers.h am adaugat eu structurile folosite pe langa macro-ul de DIE. 
+
+Structura message pastreaza mesajul primit de la client udp si trimis la client tcp.
+Contine un camp de topic care reprezinta topicul mesajului de maxim 50 de caractere.
+Un camp de data_type care reprezinta tipul de date stocat intrun intreg de un octet(poate fi 0,1,2 sau 3).
+Un camp msg de maxim 1500 de caractere ce reprezinta mesajul propriu zis care trebuie transmis. msg este parsat dupa primirea din udp astfel incat sa fie un string care afiseaza si numerele de tip int, float sau short_real.
+Un camp addrinfo formatat la primirea mesajului prin udp, cu adresa ip a udp-ului si portul udp-ului.
+
+Structurea abonare este o structura delista simplu inlantuita ce contine numele topicului la care se aboneaza si metoda prin care se aboneaza(cu store&foreward sau nu).
+
+Structura message_list este o structura de lista simplu inlantuita ce contine un camp info reprezentand un mesaj de tip message.
+
+Structura subscribers este o structura de lista simplu inlantuita ce contine id-ul unui client, socketul actual al clientului, o lista cu mesaje de transmis, o lista cu abonarile clientului.
+Socketul actual devine -1 daca clientul se deconecteaza si se modifica la fiecare conectare.
+Lista de mesaje este folosita pentru a pastra mesajele primite de care clientul este interesat cat timp este deconectat.
+Lista de abonari pastreaza toate abonarile facute si le elimina in momentul in care un client da unsubscribe.
+
+Structura topicused este o structura de lista simplu inlantuita ce contine numele topicului. De fiecare data cand un client este interesat de un topic nou acesta este adaugat in lista.
+La primirea unui mesaj se verifica intai daca lista aceasta contine acel topic. In caz contrat mesajul este ignorat.
+
+In fisierul subscriber.c deschid socketul unui client de tip TCP. Citesc comenzii de la tastatura si le trimit serverului sa le analizeze. Primesc de la server mesaje si le afisez.
+
+Deschid socketul. 
+Fac conexiunea cu serverul. Ii trimit serverului ID-ul primit ca argument la apelare. 
+Adaug intr-o lista socketul si 0(file descriptorul pentru STDIN).
+Se realizeaza o multiplexare pentru a verifica de unde primesc date, de la stdin sau de la server.
+Daca primesc date de la STDIN citesc in buffer datele. Daca primesc comanda exit inchid programul.
+Altfel trimit serverului comanda primita sa o analizeze.
+Daca primesc date pe socket atunci dau recv la date de la server. Daca tocmai i-am trimis un mesaj afisez raspunsul la comanda.
+Daca comanda a fost buna primesc textul "(un)subscribed <topic>".
+Daca comanda a fost gresita primesc "Unknown command".
+Daca nu am trimis nimic inainte primesc in buffer un message si il copiez intr-un m.
+Afisez toate campurile mesajului.
+Dupa comanda exit inchid socketul si eliberez memoria folosita.
+Pe parcurs daca primesc de la server un mesaj de lungime 0 sau 1 inchid programul.
+0 inseamna ca serverul a fost inchis.
+1 inseamna ca ID-ul folosit de mine exista deja.
+
+In server.c am implementate operatiile pe structuri si in main am lucrul cu socketi si multiplexarea lor.
+Am implementat functii de alocare de celula pentru ficare tip de lista din helper.h
+Am implementat functii de inserare in lista pentru ficare tip de lista din helper.h
+Am implementat functii de eliberare memorie pentru fiecare tip de lista din helper.h
+Functia cautare_topic cauta un topic intr-o lista topicused. Daca se gaseste se intoarce 1. Daca nu se gaseste se intoarce 0.
+Functia eliminare_topic elimina un topic dintr-o lista de topicused. Daca nu se gaseste se intoarce 0.
+Functia eliminare_abonare elimina un element dintr-o lista de abonare in functie de topicul acesteia.
+Functia cauta_topic_in_subs verifica toata lista de subscriberi si intoarce 1 daca macar un subscriber e abonat la un topic. 0 daca nici un subscriber nu e abonat la topic.
+Functia modificare_sock primeste o lista de subsciberi un id si un socket (x).
+Cauta in lista un subscriber care are id-ul egal cu cel primit ca parametru. Daca acel subs are un socket valid(mai mare ca 0) intoarce -1.
+Modifica socketul subscriberului.
+Daca subscriberul are mesaje in lista de mesaje, le trimite si elibereaza lista.
+Daca s-a gasit un subscriber cu socket invalid (-1) se intoarce 1 dupa ce s-a modificat socketul.
+Daca nu s-a gasit un subscriber cu acelasi id se intoarce 0.
+Functia cautare_sock primeste o lista de subscriberi si intoarce un pointer la un subscriber care are socketul=x.
+Functia modificare_sf primeste o lista de abonari. Daca se gaseste topicul in lista ii modifica sf-ul si intoarce 1. 
+Daca topicul nu exista in lista intoarce 0.
+Functia print_ip scrie intr-un char* adresa ip in format human readable si il intoarce.
+Functia primire_mesaj_udp primeste un socket de udp si un pointer la o structura message pentru a intoarce un message ca efect lateral.
+Se primeste un mesaj cu recvfrom si se parseaza mesajul completandu-se campurile din message.
+Functia send_message primeste o lista de subs si un mesaj
+Cauta in lista subscriberi care sunt abonati la topicul mesajului. Daca gaseste dar acestia sunt deconectati (au scoketul -1) insereaza mesajul in lista de mesaje.
+Daca au socket valid trimit mesajul la subscriberi.
+In main am deschis socketi.
+Primesc date de la tastatura sau pe socketi.
+Trimit date la clienti.
